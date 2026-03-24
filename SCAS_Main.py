@@ -5,12 +5,16 @@ import json
 from time import sleep
 
 # Ensure imports work regardless of where the script is run from
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+try:
+    _script_dir = os.path.dirname(os.path.abspath(__file__))
+except NameError:
+    _script_dir = os.path.abspath(os.getcwd())
+sys.path.insert(0, _script_dir)
 
 import SCAS_CSV
 from SCAS_Functions import navalbattle, initiative_order_generator, bb_collision, br_collision
 
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+SCRIPT_DIR = _script_dir
 SAVE_FILE = os.path.join(SCRIPT_DIR, "scas_save.json")
 
 def save_health(ships):
