@@ -1,11 +1,17 @@
 import random
 import os
+import sys
 import json
-import SCAS_CSV
-from SCAS_Functions import navalbattle, initiative_order_generator, bb_collision, br_collision
 from time import sleep
 
-SAVE_FILE = "scas_save.json"
+# Ensure imports work regardless of where the script is run from
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+import SCAS_CSV
+from SCAS_Functions import navalbattle, initiative_order_generator, bb_collision, br_collision
+
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+SAVE_FILE = os.path.join(SCRIPT_DIR, "scas_save.json")
 
 def save_health(ships):
     """Save current ship health values to a JSON file."""
@@ -29,8 +35,8 @@ def load_health(ships):
     return True
 
 def find_csv_files():
-    """Find all CSV files in the current directory."""
-    return [f for f in os.listdir(".") if f.endswith(".csv")]
+    """Find all CSV files in the script's directory."""
+    return [f for f in os.listdir(SCRIPT_DIR) if f.endswith(".csv")]
 
 def pick_ship(ships, prompt):
     """Prompt user to select a ship by abbreviation. Returns None if skipped."""
@@ -78,7 +84,7 @@ def main():
             if choice == "0":
                 filepath = input("Enter full file path: ").strip()
             elif choice.isdigit() and 1 <= int(choice) <= len(csv_files):
-                filepath = csv_files[int(choice) - 1]
+                filepath = os.path.join(SCRIPT_DIR, csv_files[int(choice) - 1])
             else:
                 print("Invalid selection, try again.")
                 continue
