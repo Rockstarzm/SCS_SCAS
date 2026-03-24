@@ -2,19 +2,36 @@ import random
 import os
 import sys
 import json
+import importlib.util
 from time import sleep
 
-# Ensure imports work regardless of where the script is run from
+# Resolve the script's directory from __file__, handling both absolute and
+# relative paths as well as environments where __file__ may not be defined.
 try:
-    _script_dir = os.path.dirname(os.path.abspath(__file__))
-except NameError:
-    _script_dir = os.path.abspath(os.getcwd())
-sys.path.insert(0, _script_dir)
+    SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+    if not os.path.isfile(os.path.join(SCRIPT_DIR, "SCAS_CSV.py")):
+        raise ValueError
+except (NameError, ValueError):
+    # Fallback: search sys.argv and common locations
+    for candidate in [os.getcwd()] + sys.path:
+        if os.path.isfile(os.path.join(candidate, "SCAS_CSV.py")):
+            SCRIPT_DIR = candidate
+            break
 
-import SCAS_CSV
-from SCAS_Functions import navalbattle, initiative_order_generator, bb_collision, br_collision
+def _load_local(name):
+    """Import a .py file from the same directory as this script by file path."""
+    path = os.path.join(SCRIPT_DIR, f"{name}.py")
+    spec = importlib.util.spec_from_file_location(name, path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
 
-SCRIPT_DIR = _script_dir
+SCAS_CSV = _load_local("SCAS_CSV")
+_funcs = _load_local("SCAS_Functions")
+navalbattle = _funcs.navalbattle
+initiative_order_generator = _funcs.initiative_order_generator
+bb_collision = _funcs.bb_collision
+br_collision = _funcs.br_collision
 SAVE_FILE = os.path.join(SCRIPT_DIR, "scas_save.json")
 
 def save_health(ships):
