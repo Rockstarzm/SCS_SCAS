@@ -1,0 +1,13 @@
+Abbreviation,Team,Name,Type,Ship Class,Starting Zone,Notes,Attack,Defense,Health,Combat Range,Movement
+usscg1,Blue,USS Ticonderoga,Surface,Cruiser,Zone Alpha,,5,4,8,3,4
+usscg2,Blue,USS Bunker Hill,Surface,Cruiser,Zone Alpha,,5,4,8,3,4
+ussdd1,Blue,USS Arleigh Burke,Surface,Destroyer,Zone Alpha,,4,3,6,2,5
+ussdd2,Blue,USS John Paul Jones,Surface,Destroyer,Zone Bravo,,4,3,6,2,5
+usscv1,Blue,USS Nimitz,Surface,Carrier,Zone Bravo,Flagship,2,5,12,1,3
+ussff1,Blue,USS Freedom,Surface,Frigate,Zone Bravo,,3,2,4,2,6
+prcdd1,Red,Nanchang,Surface,Destroyer,Zone Alpha,,4,3,6,2,5
+prcdd2,Red,Lhasa,Surface,Destroyer,Zone Alpha,,4,3,6,2,5
+prccg1,Red,Renhai,Surface,Cruiser,Zone Alpha,,5,4,8,3,4
+prcff1,Red,Xining,Surface,Frigate,Zone Bravo,,3,2,4,2,6
+prcff2,Red,Yancheng,Surface,Frigate,Zone Bravo,,3,2,4,2,6
+prccv1,Red,Fujian,Surface,Carrier,Zone Bravo,Flagship,2,5,12,1,3

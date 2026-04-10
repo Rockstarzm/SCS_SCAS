@@ -1,138 +1,284 @@
 import random
-import SCAS_CSV
-from SCAS_Functions import navalbattle, initiative_order_generator, bb_collision, br_collision
+import os
+import sys
+import json
+import importlib.util
 from time import sleep
-#main loop def and calling it
 
-def main(): #core game function
-    #starts with some intro stuff
-    running = True 
-    print("Hello! Welcome to the Python Script for the Strategic Combat Adjudication System (SCAS)!" 
+# Resolve the script's directory from __file__, handling both absolute and
+# relative paths as well as environments where __file__ may not be defined.
+try:
+    SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+    if not os.path.isfile(os.path.join(SCRIPT_DIR, "SCAS_CSV.py")):
+        raise ValueError
+except (NameError, ValueError):
+    # Fallback: search sys.argv and common locations
+    for candidate in [os.getcwd()] + sys.path:
+        if os.path.isfile(os.path.join(candidate, "SCAS_CSV.py")):
+            SCRIPT_DIR = candidate
+            break
+
+def _load_local(name):
+    """Import a .py file from the same directory as this script by file path."""
+    path = os.path.join(SCRIPT_DIR, f"{name}.py")
+    spec = importlib.util.spec_from_file_location(name, path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+SCAS_CSV = _load_local("SCAS_CSV")
+_funcs = _load_local("SCAS_Functions")
+navalbattle = _funcs.navalbattle
+initiative_order_generator = _funcs.initiative_order_generator
+bb_collision = _funcs.bb_collision
+br_collision = _funcs.br_collision
+SAVE_FILE = os.path.join(SCRIPT_DIR, "scas_save.json")
+
+def save_health(ships):
+    """Save current ship health values to a JSON file."""
+    health_data = {abbr: ship.health for abbr, ship in ships.items()}
+    with open(SAVE_FILE, "w") as f:
+        json.dump(health_data, f, indent=2)
+    print(f"Health saved to {SAVE_FILE}")
+
+def load_health(ships):
+    """Load saved health values from JSON file if it exists."""
+    if not os.path.exists(SAVE_FILE):
+        return False
+    with open(SAVE_FILE, "r") as f:
+        health_data = json.load(f)
+    restored = 0
+    for abbr, health in health_data.items():
+        if abbr in ships:
+            ships[abbr].health = health
+            restored += 1
+    print(f"Restored health for {restored} ships from save file.")
+    return True
+
+def find_csv_files():
+    """Find all CSV files in the script's directory."""
+    return [f for f in os.listdir(SCRIPT_DIR) if f.endswith(".csv")]
+
+def pick_ship(ships, prompt):
+    """Prompt user to select a ship by abbreviation. Returns None if skipped."""
+    while True:
+        abbr = input(prompt)
+        if abbr == "0":
+            print("Skipping")
+            return None
+        if abbr in ships:
+            return ships[abbr]
+        print(f"Ship not found. Available: {', '.join(ships.keys())}")
+
+def show_ship_stats(ship):
+    """Display all stats for a ship."""
+    print(f"\n--- {ship.name} ---")
+    print(f"  Team:          {ship.team}")
+    print(f"  Type:          {ship.type}")
+    print(f"  Class:         {ship.ship_class}")
+    print(f"  Starting Zone: {ship.starting_zone}")
+    print(f"  Attack:        {ship.attack}")
+    print(f"  Defense:       {ship.defense}")
+    print(f"  Health:        {ship.health}")
+    print(f"  Combat Range:  {ship.combat_range}")
+    print(f"  Movement:      {ship.movement}")
+    if ship.notes:
+        print(f"  Notes:         {ship.notes}")
+    print()
+
+def main():
+    print("Welcome to the Strategic Combat Adjudication System (SCAS)!"
           "\nWritten and Designed by Zachary Miller"
           "\n---------------------------------------------------------------------------------------")
-    sleep(1.5)
-    print("You should be able to just type into your terminal to interact with the program."
-          "\n---------------------------------------------------------------------------------------")
-    sleep(1.5)
-    print("You can learn more about this program in the SCAS file on the SCS Drive."
-           "\nThis program is only intended to work with the google Sheet/CSV spreadsheet found in the SCAS Folder"
-           "\n---------------------------------------------------------------------------------------")
-    sleep(2.0)
-    while True: #asks user to put in specific style of csv spreadsheet in instructions
+    sleep(1.0)
+
+    # --- CSV Loading with auto-detect ---
+    csv_files = find_csv_files()
+    ships = None
+    while ships is None:
+        if csv_files:
+            print("\nCSV files found in current directory:")
+            for i, f in enumerate(csv_files, 1):
+                print(f"  {i}. {f}")
+            print(f"  0. Enter a file path manually")
+            choice = input("Select a file (number): ").strip()
+            if choice == "0":
+                filepath = input("Enter full file path: ").strip()
+            elif choice.isdigit() and 1 <= int(choice) <= len(csv_files):
+                filepath = os.path.join(SCRIPT_DIR, csv_files[int(choice) - 1])
+            else:
+                print("Invalid selection, try again.")
+                continue
+        else:
+            print("\nNo CSV files found in current directory.")
+            filepath = input("Enter full file path to your OBAT .csv file: ").strip()
+
         try:
-            ships = SCAS_CSV.import_obat(input("Please write the exact file path and name of the .csv file you wish to upload."
-                                       "\nThis will look something like /Users/zacharymiller/Downloads/Tranquil Seas OBAT.csv/"
-                                       "\nYou can see other examples and more information in the SCAS Drive"
-                                       "\nPlease remember to include the .csv "
-                                       "\n  Input the file path here: "))
-            break
-        except FileNotFoundError: #if they do it wrong, then it errors and asks again
-            ###bug: right now you have to exit the terminal if you can't input correct filename
-            print("Error: File not found.")
-            sleep(1.0)
-    sleep(1.5)
-    while running: #core game loop
-        x = input("Please select" #core selector screen
-                      "\n1 if you would like to initate a naval combat "
-                      "\n2 if you would like to check or change a value on an asset (WIP) "
-                      "\n3 if you would like to input a ship collision (Broken) "
-                      "\n4 if you would like to generate an initiative order for combat (Defunct) "
-                      "\n0 to end the program "
-                      "\n  input: ")
-                        ###Bug: most of these don't work rn
-        if x == "1": #Naval Battle selector
-            user_input = input("Please input the number of combats in this sea zone: ") #asks for number of combats, know how many times to iterate
+            ships = SCAS_CSV.import_obat(filepath)
+        except FileNotFoundError:
+            print(f"Error: File '{filepath}' not found. Please try again.")
+        except Exception as e:
+            print(f"Error reading file: {e}. Please try again.")
+
+    # --- Offer to load saved health ---
+    if os.path.exists(SAVE_FILE):
+        choice = input("Saved health data found. Load it? (y/n): ").strip().lower()
+        if choice == "y":
+            load_health(ships)
+
+    # --- Main loop ---
+    running = True
+    while running:
+        x = input("\nPlease select:"
+                   "\n  1. Naval combat"
+                   "\n  2. Check ship stats"
+                   "\n  3. Ship collision"
+                   "\n  4. Generate initiative order"
+                   "\n  5. Fleet battle (auto-pair by zone)"
+                   "\n  6. Save health"
+                   "\n  7. List all ships"
+                   "\n  0. Exit program"
+                   "\n  Input: ").strip()
+
+        if x == "1": # --- Naval Battle ---
+            user_input = input("Number of combats in this sea zone: ").strip()
             while True:
-                try: 
+                try:
                     number_of_combats = int(user_input)
                     break
-                except ValueError: #error if they don't write down integer
-                    print("Error: Please write in a whole integer")
-                    user_input = input("Please input the number of combats in this sea zone: ")
-        
-            ships_in_combat = [] #creates a list for the combats
-            for i in range(number_of_combats): #for the number of combats the program will ask for the attacking and defending ship in a pair
-                while True:
-                    object_name = input("Which ship is attacking: ") #asks for attacking ship
-                    if object_name == "0": #can press 0 to skip input for devs
-                        print("Skipping")
-                        break
-                    elif object_name in ships: #if unit exists in the ships list than it is shipA
-                        shipA = ships[object_name]
-                        break
-                    else: #if the ship doesn't exist in the list
-                        print("Ship not found")
-                    
-                while True:
-                    object_name = input("Which ship is defending: ") #asks for attacking ship
-                    if object_name == "0":
-                        print("Skipping")
-                        break
-                    elif object_name in ships:
-                        shipD = ships[object_name]
-                        break
-                    else:
-                        print("Ship not found")
-            
-                ships_in_combat.append([shipA, shipD]) #adds the ordered pair to the list
-                sorted_ships_in_combat = sorted(ships_in_combat, key=lambda x: (x[0].combat_range, random.random()), reverse=True) #sorts all the ships in combat by their combat_range
-            for ship_pair in sorted_ships_in_combat: #Need to work on this more, but gives the name in the range of the attacking ship
-                print(ship_pair[0].name)
-            for ship_pair in sorted_ships_in_combat: #Runs combats starting with first pair on the list
-                navalbattle(ship_pair[0], ship_pair[1])
+                except ValueError:
+                    print("Error: Please enter a whole number")
+                    user_input = input("Number of combats: ").strip()
 
-        elif x == "2": #ship###Bug: Doesn't work
-            while True:
-                object_name = input("What ship's health would you like to check? ") #asks for attacking ship
-                if object_name == "0":
-                    print("Skipping")
-                    break
-                elif object_name in ships:
-                    shipA = ships[object_name]
-                    break
-                else:
-                    print("Ship not found")
-            if shipA.health == 0:
-                print(f"{shipA.name} is destroyed and has {shipA.health} health")
-            else: 
-                print(f"{shipA.name} has {shipA.health} health remaining")
-       
-        elif x == "3": #Collision sub-menu, no idea if this is really useful
-            y = int(input("Press 1 if friendly ships share a tile"
-                          "\nPress 2 if enemy ships share a tile"
-                          "\nPress 0 to exit back to program select"
-                          "\nInput: "))
-            if y == 1: #blue on blue collision
-                ship_blue1 = eval(input("Friendly ship 1 "))
-                ship_blue2 = eval(input("Friendly ship 2 "))
-                bb_collision(ship_blue1, ship_blue2)
+            ships_in_combat = []
+            for i in range(number_of_combats):
+                shipA = pick_ship(ships, "Attacking ship: ")
+                if shipA is None:
+                    continue
+                shipD = pick_ship(ships, "Defending ship: ")
+                if shipD is None:
+                    continue
+                ships_in_combat.append([shipA, shipD])
 
-            elif y == 2: #blue on red collision
-                ship_blue = eval(input("Ship 1"))
-                ship_red = eval(input("Ship 2 "))
-                br_collision(ship_blue, ship_red)
+            if ships_in_combat:
+                sorted_ships = sorted(ships_in_combat, key=lambda p: (p[0].combat_range, random.random()), reverse=True)
+                print("\n=== Combat Order (by range) ===")
+                for pair in sorted_ships:
+                    print(f"  {pair[0].name} vs {pair[1].name}")
+                print()
+                for pair in sorted_ships:
+                    navalbattle(pair[0], pair[1])
 
-            elif y == 0: #go back
+        elif x == "2": # --- Ship Stats ---
+            ship = pick_ship(ships, "Which ship to check? (0 to cancel): ")
+            if ship:
+                show_ship_stats(ship)
+
+        elif x == "3": # --- Collision ---
+            y = input("1. Friendly ships share a tile"
+                      "\n2. Enemy ships share a tile"
+                      "\n0. Back"
+                      "\nInput: ").strip()
+            if y == "1":
+                ship1 = pick_ship(ships, "Friendly ship 1: ")
+                ship2 = pick_ship(ships, "Friendly ship 2: ")
+                if ship1 and ship2:
+                    bb_collision(ship1, ship2)
+            elif y == "2":
+                ship1 = pick_ship(ships, "Ship 1: ")
+                ship2 = pick_ship(ships, "Ship 2: ")
+                if ship1 and ship2:
+                    br_collision(ship1, ship2)
+            elif y == "0":
                 print("Back to selection")
-                
-            else: #what the heck
-                print("Error: expected 0, 1, or 2")
-        elif x == "4": #Defunct dont use
-            num_input = int(input("Input the number of ships with the same initiative order: "))
-            initiative_order_generator(num_input)
-
-        elif x == "0": #end
-            x = input(print("This will close the program and all health statistics will be reset "
-                            "\nPlease confirm by pressing y (press n to return back)"
-                            "\n (y/n): ")) #want to confirm closing by extra step
-            if x == "y":
-                print("Closing Program")
-                running = False
-            elif x=="n":
-                running = True
             else:
-                print("Error: expexted y or n (lowercase)")
-        
-        else: #error
-            print("error: expected 0, 1, 2, or 3 ")
+                print("Error: expected 0, 1, or 2")
+
+        elif x == "4": # --- Initiative Order ---
+            user_input = input("Number of ships to roll initiative for: ").strip()
+            try:
+                num = int(user_input)
+                initiative_order_generator(num)
+            except ValueError:
+                print("Error: Please enter a whole number")
+
+        elif x == "5": # --- Fleet Battle (auto-pair by zone) ---
+            # Get all unique zones that have ships from different teams
+            zones = {}
+            for abbr, ship in ships.items():
+                if ship.health <= 0:
+                    continue
+                zone = ship.starting_zone
+                if zone not in zones:
+                    zones[zone] = {}
+                team = ship.team
+                if team not in zones[zone]:
+                    zones[zone][team] = []
+                zones[zone][team].append(ship)
+
+            contested_zones = {z: teams for z, teams in zones.items() if len(teams) >= 2}
+
+            if not contested_zones:
+                print("No contested zones found (need ships from 2+ teams in the same zone).")
+            else:
+                print("\nContested zones:")
+                zone_list = list(contested_zones.keys())
+                for i, zone in enumerate(zone_list, 1):
+                    teams = contested_zones[zone]
+                    ship_count = sum(len(s) for s in teams.values())
+                    print(f"  {i}. {zone} ({ship_count} ships, {len(teams)} teams)")
+
+                choice = input("Select zone (number, or 0 to cancel): ").strip()
+                if choice.isdigit() and 1 <= int(choice) <= len(zone_list):
+                    zone = zone_list[int(choice) - 1]
+                    teams = contested_zones[zone]
+                    team_names = list(teams.keys())
+
+                    if len(team_names) == 2:
+                        team_a, team_b = team_names
+                    else:
+                        print("Teams in this zone:")
+                        for i, t in enumerate(team_names, 1):
+                            print(f"  {i}. {t}")
+                        a = int(input("Attacking team (number): ")) - 1
+                        b = int(input("Defending team (number): ")) - 1
+                        team_a, team_b = team_names[a], team_names[b]
+
+                    attackers = teams[team_a]
+                    defenders = teams[team_b]
+
+                    # Pair ships: each attacker engages one defender, cycling if outnumbered
+                    pairs = []
+                    for i, attacker in enumerate(attackers):
+                        defender = defenders[i % len(defenders)]
+                        pairs.append([attacker, defender])
+
+                    sorted_pairs = sorted(pairs, key=lambda p: (p[0].combat_range, random.random()), reverse=True)
+                    print(f"\n=== Fleet Battle in {zone}: {team_a} vs {team_b} ===")
+                    for pair in sorted_pairs:
+                        print(f"  {pair[0].name} vs {pair[1].name}")
+                    print()
+                    for pair in sorted_pairs:
+                        navalbattle(pair[0], pair[1])
+
+        elif x == "6": # --- Save Health ---
+            save_health(ships)
+
+        elif x == "7": # --- List All Ships ---
+            print("\n=== All Ships ===")
+            for abbr, ship in ships.items():
+                status = "SUNK" if ship.health <= 0 else f"{ship.health} HP"
+                print(f"  [{abbr}] {ship.name} ({ship.team}) - {status}")
+            print()
+
+        elif x == "0": # --- Exit ---
+            confirm = input("Save health before exiting? (y/n): ").strip().lower()
+            if confirm == "y":
+                save_health(ships)
+            print("Closing Program")
+            running = False
+
+        else:
+            print("Error: invalid selection")
+
 main()

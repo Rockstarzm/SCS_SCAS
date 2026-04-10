@@ -1,5 +1,4 @@
 import random
-import SCAS_CSV
 
 #Extra functions:
 def br_collision(ship_blue, ship_red): #Bluefor/redfor collision
@@ -7,7 +6,11 @@ def br_collision(ship_blue, ship_red): #Bluefor/redfor collision
     if c <= 3: #30% chance that both ships take 1 damage
         ship_blue.health -= 1
         ship_red.health -= 1
-        print("Collision")
+        print(f"Collision! {ship_blue.name} and {ship_red.name} each take 1 damage.")
+        if ship_blue.health <= 0:
+            print(f"  {ship_blue.name} has been destroyed!")
+        if ship_red.health <= 0:
+            print(f"  {ship_red.name} has been destroyed!")
     else:
         print("No Collision")
 
@@ -16,7 +19,11 @@ def bb_collision(ship_blue1, ship_blue2): #blue on blue collision
     if c <=1: #10% chance that ships take 1 damage
         ship_blue1.health -=1
         ship_blue2.health -=1
-        print("Collision")
+        print(f"Collision! {ship_blue1.name} and {ship_blue2.name} each take 1 damage.")
+        if ship_blue1.health <= 0:
+            print(f"  {ship_blue1.name} has been destroyed!")
+        if ship_blue2.health <= 0:
+            print(f"  {ship_blue2.name} has been destroyed!")
     else:
         print("No Collision")
 
@@ -26,50 +33,44 @@ def initiative_order_generator(num_inputs):
         user_input = input("Enter ship: ")
         ships_in_combat.append((user_input, random.randint(1,100)))
     ships_in_combat.sort(key=lambda x: x[1], reverse=True)
-    for user_input, i in ships_in_combat:
-        print(f"{user_input}")
+    print("\n--- Initiative Order ---")
+    for rank, (ship_name, roll) in enumerate(ships_in_combat, 1):
+        print(f"  {rank}. {ship_name} (rolled {roll})")
+    print()
 
 #Meat and potatoes
 def combatround(attacker, defender): #This is the actual how a combat works function
-    x = sum(random.randint(1,8) for i in range(attacker.attack)) #sums random number d8 depending on attack value
-    print(x)
-    y = sum(random.randint(1,8) for j in range(defender.defense)) #sums random number d8 depending on defense values
-    print(y)
-    z = x - y #evaluates if attack value is bigger than defense value
-    if z >= 1: #if it is then defending ship takes 1 point of damage for each value
-        for z in range(0,z):
-            defender.health -= 1
-            if defender.health <= 0: #if the ship health =0 the ship is sunk
-                print(defender.name, "sunk")
-                break
+    attack_roll = sum(random.randint(1,8) for i in range(attacker.attack)) #sums random number d8 depending on attack value
+    defense_roll = sum(random.randint(1,8) for j in range(defender.defense)) #sums random number d8 depending on defense values
+    print(f"  {attacker.name} rolls {attacker.attack}d8 = {attack_roll}")
+    print(f"  {defender.name} defends {defender.defense}d8 = {defense_roll}")
+    damage = attack_roll - defense_roll
+    if damage >= 1:
+        defender.health = max(0, defender.health - damage)
+        if defender.health <= 0:
+            print(f"  {damage} damage! {defender.name} is sunk!")
         else:
-            print(f"{defender.name} has {defender.health} health remaining")
-    elif z < 1: #otherwise nothing happens
-        print(defender.name, "successfully defended against attack")
+            print(f"  {damage} damage! {defender.name} has {defender.health} health remaining")
+    else:
+        print(f"  {defender.name} successfully defended against attack")
 
-def navalbattle (shipA, shipD):
-    #naval battle fuction, shipA is attacking ship, shipD is defending ship, cur_combat_range is current combat range
+def navalbattle(shipA, shipD):
+    #naval battle function, shipA is attacking ship, shipD is defending ship
+    if shipA.health <= 0:
+        print(f"Error: {shipA.name} is already sunk (health: {shipA.health})")
+        return
+    if shipD.health <= 0:
+        print(f"Error: {shipD.name} is already sunk (health: {shipD.health})")
+        return
+
     defender_range_var = shipD.combat_range - shipA.combat_range
-    #subtracts defender ship's max range by the current combat range, assigns result to variable 
-    if defender_range_var < 0: #checks if defender is out of range, if they are out of range then only attacker fires
-        print("Attack ship shoots, defense ship can't")
-        if shipA.health <= 0: #if the attack ship's health 
-                print(f"Error: attacking ship is already sunk. \nAttacking ship, {shipA.name}, health is reporting as {shipA.health}")
-        elif shipD.health <= 0:
-                print(f"Error: defending ship is already sunk. \nDefending ship, {shipD.name}, health is reporting as {shipD.health}")
-        else:
-            combatround(shipA, shipD)
-    else: #if both ships are in range than it checks for health
-        print(f"Both are in range")
-        if shipA.health <= 0: #if the attacking ship is sunk, then errors
-                print(f"Error: attacking ship is already sunk. \nAttacking ship, {shipA.name}, health is reporting as {shipA.health}")
-        elif shipD.health <= 0:#if the defending ship is sunk, then errors
-                print(f"Error: defending ship is already sunk. \nDefending ship, {shipD.name}, health is reporting as {shipD.health}")
-        else: #if nothing errors than combat! YAY!
-            combatround(shipA, shipD)
-            if shipD.health > 0: #if Defender is still alive than they get to shoot back
-                combatround(shipD, shipA)
-
-def shipstatchanger (shipA):
-    print("IDK yet")
-
+    print(f"\n--- {shipA.name} vs {shipD.name} ---")
+    if defender_range_var < 0:
+        print(f"{shipA.name} fires (defender out of range)")
+        combatround(shipA, shipD)
+    else:
+        print(f"Both ships in range")
+        combatround(shipA, shipD)
+        if shipD.health > 0: #if Defender is still alive they get to shoot back
+            combatround(shipD, shipA)
+    print()
